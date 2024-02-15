@@ -1,88 +1,95 @@
+
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
+import java.io.PrintWriter;
 
 public class ColorHistogram {
-    private double[] bins;
-    private int depth;
+    private int d; // The number of bits per channel
+    private double[] histogram; // The normalized histogram
 
     // Constructor for a d-bit image
     public ColorHistogram(int d) {
-        this.depth = d;
-        int binCount = (int) Math.pow(2, d * 3);
-        this.bins = new double[binCount];
+        this.d = d;
+        int size = (int) Math.pow(2, this.d * 3);
+        this.histogram = new double[size];
     }
 
     // Constructor that constructs a ColorHistogram from a text file
     public ColorHistogram(String filename) throws IOException {
-        loadHistogramFromFile(filename);
+        this.load(filename);
     }
 
-    // Method to associate an image with this histogram instance
+    // Method to associate an image with a histogram instance
     public void setImage(ColorImage image) {
-        computeHistogram(image);
-    }
-
-    // Returns the normalized histogram of the image
-    public double[] getHistogram() {
-        return bins;
-    }
-
-    // Method to compare two histograms and return their intersection
-    public double compare(ColorHistogram other) {
-        double intersection = 0.0;
-        for (int i = 0; i < this.bins.length; i++) {
-            intersection += Math.min(this.bins[i], other.bins[i]);
-        }
-        return intersection;
-    }
-
-    // Method to save the histogram into a text file
-    public void save(String filename) throws IOException {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
-            for (double bin : bins) {
-                writer.write(bin + "\n");
-            }
-        }
-    }
-
-    // Private helper method to compute the histogram from a ColorImage
-    private void computeHistogram(ColorImage image) {
-        Arrays.fill(bins, 0); // Reset bins to 0 before computing the histogram
-        int colorRange = (int) Math.pow(2, depth);
-        int colorMaxValue = image.getDepth(); // Use the depth from the image
-        int scaleFactor = colorMaxValue / (colorRange - 1);
+        int shift = 8 - this.d;
+        int size = (int) Math.pow(2, this.d * 3);
+        this.histogram = new double[size];
+        int totalPixels = image.getWidth() * image.getHeight();
 
         for (int i = 0; i < image.getWidth(); i++) {
             for (int j = 0; j < image.getHeight(); j++) {
-                int[] rgb = image.getPixel(i, j);
-                int r = rgb[0] / scaleFactor;
-                int g = rgb[1] / scaleFactor;
-                int b = rgb[2] / scaleFactor;
-                int index = (r << (2 * depth)) + (g << depth) + b;
-                bins[index]++;
+                int[] pixel = image.getPixel(i, j);
+                int r = pixel[0] >> shift;
+                int g = pixel[1] >> shift;
+                int b = pixel[2] >> shift;
+                int index = (r << (2 * this.d)) + (g << this.d) + b;
+                this.histogram[index]++;
             }
         }
 
         // Normalize the histogram
-        int totalPixels = image.getWidth() * image.getHeight();
-        for (int i = 0; i < bins.length; i++) {
-            bins[i] /= totalPixels;
+        for (int i = 0; i < this.histogram.length; i++) {
+            this.histogram[i] /= totalPixels;
         }
     }
 
-    // Private helper method to load the histogram from a text file
-    private void loadHistogramFromFile(String filename) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
-            this.bins = reader.lines()
-                              .skip(1) // Assuming the first line might be metadata like total bin count
-                              .flatMap(line -> Arrays.stream(line.trim().split("\\s+")))
-                              .mapToDouble(Double::parseDouble)
-                              .toArray();
-            this.depth = (int) (Math.log(bins.length) / Math.log(2) / 3); // Recalculate the depth based on the number of bins
+    // Method to return the normalized histogram of the image
+    public double[] getHistogram() {
+        return this.histogram;
+    }
+
+    // Method that returns the intersection between two histograms
+    public double compare(ColorHistogram hist) {
+        double sum = 0.0;
+        for (int i = 0; i < this.histogram.length; i++) {
+            sum += Math.min(this.histogram[i], hist.histogram[i]);
+        }
+        return sum;
+    }
+
+    // Method that saves the histogram into a text file
+    public void save(String filename) throws IOException {
+        try (PrintWriter out = new PrintWriter(filename)) {
+            for (double val : this.histogram) {
+                out.println(val);
+            }
         }
     }
+
+// Method to load the histogram from a text file
+private void load(String filename) throws IOException {
+    try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+        String line = br.readLine(); // Read the first line to  the number of bins
+        if (line != null) {
+            int numberOfBins = Integer.parseInt(line.trim());
+            this.histogram = new double[numberOfBins]; // Initialize the histogram array
+        }
+        
+        int binIndex = 0; // Index for placing counts into the histogram
+        while ((line = br.readLine()) != null) {
+            String[] numbers = line.split("\\s+"); // Split the line into individual numbers
+            for (String number : numbers) {
+                if (binIndex < this.histogram.length) {
+                    this.histogram[binIndex] = Double.parseDouble(number.trim()) / 255.0; // Normalizing the count by dividing by 255
+                    binIndex++;
+                }
+            }
+        }
+        
+        if (binIndex != this.histogram.length) {
+            throw new IOException("Histogram file format is incorrect. Expected " + this.histogram.length + " bins, but found " + binIndex);
+        }
+    }
+}
 }

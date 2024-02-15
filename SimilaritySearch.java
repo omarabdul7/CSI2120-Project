@@ -1,89 +1,67 @@
 import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleEntry;
 
 public class SimilaritySearch {
 
-    private static final int COLOR_DEPTH = 3; // Assuming 3-bit color depth for histogram comparison
-    private static final int TOP_K = 5; // Number of top similar images to find
-
+    
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.out.println("Usage: java SimilaritySearch <query_image_path> <image_dataset_directory>");
-            return;
+            System.out.println("Usage: java SimilaritySearch <query_image.ppm> <dataset_directory>");
+            System.exit(1);
         }
 
-        String queryImagePath = args[0];
-        String imageDatasetDirectory = args[1];
+        String queryImageFilename = args[0];
+        String datasetDirectory = args[1];
+        int d = 3; // Color depth for histogram
+        int k = 5; // Number of most similar images to find
 
         try {
-            // Compute the histogram for the query image
-            ColorImage queryImage = new ColorImage(queryImagePath);
-            queryImage.reduceColor(COLOR_DEPTH);
-            ColorHistogram queryHistogram = new ColorHistogram(3); // Assuming 512 bins for a 3-bit depth histogram
+            ColorImage queryImage = new ColorImage(queryImageFilename);
+            ColorHistogram queryHistogram = new ColorHistogram(d);
             queryHistogram.setImage(queryImage);
 
-            // Directory containing the dataset histograms
-            File dir = new File(imageDatasetDirectory);
-            File[] directoryListing = dir.listFiles();
-            if (directoryListing != null) {
-                PriorityQueue<ImageSimilarity> pq = new PriorityQueue<>(Collections.reverseOrder());
-
-                for (File child : directoryListing) {
-                    if (child.getName().endsWith(".txt")) { // Process only .txt files
-                        ColorHistogram datasetHistogram = new ColorHistogram(child.getAbsolutePath());
-
-                        // Calculate the similarity score
-                        double similarityScore = queryHistogram.compare(datasetHistogram);
-
-                        // Add to the priority queue
-                        pq.add(new ImageSimilarity(child.getName(), similarityScore));
-
-                        // Ensure the priority queue never holds more than TOP_K elements
-                        while (pq.size() > TOP_K) {
-                            pq.poll();
-                        }
-                    }
+            File dir = new File(datasetDirectory);
+            File[] datasetFiles = dir.listFiles(new FilenameFilter() {
+                public boolean accept(File dir, String name) {
+                    return name.toLowerCase().endsWith(".jpg.txt");
                 }
+            });
 
-                // Print the top K similar images
-                List<ImageSimilarity> topKSimilarImages = new ArrayList<>(pq);
-                Collections.sort(topKSimilarImages, Collections.reverseOrder());
-                
-                System.out.println("Top " + TOP_K + " most similar images:");
-                for (ImageSimilarity sim : topKSimilarImages) {
-                    System.out.println(sim.getImageName() + " - Similarity Score: " + sim.getSimilarityScore());
+            PriorityQueue<Entry<String, Double>> pq = new PriorityQueue<>(
+                (a, b) -> Double.compare(b.getValue(), a.getValue())
+            );
+
+            for (File histogramFile : datasetFiles) {
+                ColorHistogram datasetHistogram = new ColorHistogram(histogramFile.getAbsolutePath());
+                double similarity = queryHistogram.compare(datasetHistogram);
+                pq.offer(new SimpleEntry<>(histogramFile.getName(), similarity));
+
+                if (pq.size() > k) {
+                    pq.poll();
                 }
-            } else {
-                System.out.println("Image dataset directory does not exist or is not a directory.");
             }
-        } catch (Exception e) {
+
+            List<String> mostSimilarImages = new ArrayList<>();
+            while (!pq.isEmpty()) {
+                // Extract the base name without ".jpg.txt" and append ".jpg" to get the image filename
+                String baseName = pq.poll().getKey().replace(".jpg.txt", "");
+                String imageFileName = baseName + ".jpg";
+                mostSimilarImages.add(0, imageFileName);
+            }
+
+            System.out.println("The 5 most similar images to " + queryImageFilename + " are:");
+            for (String imageName : mostSimilarImages) {
+                System.out.println(imageName);
+            }
+
+        } catch (IOException e) {
             e.printStackTrace();
-        }
-    }
-
-    private static class ImageSimilarity implements Comparable<ImageSimilarity> {
-        private final String imageName;
-        private final double similarityScore;
-
-        public ImageSimilarity(String imageName, double similarityScore) {
-            this.imageName = imageName;
-            this.similarityScore = similarityScore;
-        }
-
-        public String getImageName() {
-            return imageName.replace(".txt", ""); // Remove .txt extension for display
-        }
-
-        public double getSimilarityScore() {
-            return similarityScore;
-        }
-
-        @Override
-        public int compareTo(ImageSimilarity other) {
-            return Double.compare(this.similarityScore, other.similarityScore);
         }
     }
 }
