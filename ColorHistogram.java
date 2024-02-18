@@ -1,26 +1,27 @@
+// CSI 2120 Project Part 1
+// Done by Omar Abdul - 300228700 and Anas Taimah - 300228842
+
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.IOException;
 
 public class ColorHistogram {
-    private int d; // The number of bits per channel
-    private double[] histogram; // The normalized histogram
+    private int d; 
+    private double[] histogram; 
 
-    // Constructor for a d-bit image
     public ColorHistogram(int d) {
         this.d = d;
-        int size = (int) Math.pow(2, this.d * 3);
+        int size = (int) Math.pow(2, this.d) * 3;
         this.histogram = new double[size];
     }
 
-    // Constructor that constructs a ColorHistogram from a text file
-    public ColorHistogram(String filename) throws IOException {
-        this.load(filename);
+    public ColorHistogram(String filename) throws IOException{
+        load(filename);
     }
 
-    // Method to associate an image with a histogram instance
+    // Setting image with histogram
     public void setImage(ColorImage image) {
         int shift = 8 - this.d;
         int size = (int) Math.pow(2, this.d * 3);
@@ -38,7 +39,7 @@ public class ColorHistogram {
             }
         }
 
-        // Normalize the histogram
+        // normalizing the histogram
         for (int i = 0; i < this.histogram.length; i++) {
             this.histogram[i] /= totalPixels;
         }
@@ -49,7 +50,7 @@ public class ColorHistogram {
         return this.histogram;
     }
 
-    // Method that returns the intersection between two histograms
+    // Retrun similarity between histograms
     public double compare(ColorHistogram hist) {
         double sum = 0.0;
         for (int i = 0; i < this.histogram.length; i++) {
@@ -58,8 +59,8 @@ public class ColorHistogram {
         return sum;
     }
 
-    // Method that saves the histogram into a text file
-    public void save(String filename) throws IOException {
+    // Save histogram
+    public void save(String filename) throws IOException{
         try (PrintWriter out = new PrintWriter(filename)) {
             for (double val : this.histogram) {
                 out.println(val);
@@ -67,29 +68,28 @@ public class ColorHistogram {
         }
     }
 
-// Method to load the histogram from a text file
-private void load(String filename) throws IOException {
-    try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
-        String line = br.readLine(); // Read the first line to  the number of bins
+    // Load Histogram
+    private void load(String filename) throws IOException {
+        BufferedReader br = null;
+        br = new BufferedReader(new FileReader(filename));
+        String line = br.readLine(); //Read starting for the first line
         if (line != null) {
             int numberOfBins = Integer.parseInt(line.trim());
-            this.histogram = new double[numberOfBins]; // Initialize the histogram array
-        }
-        
-        int binIndex = 0; // Index for placing counts into the histogram
-        while ((line = br.readLine()) != null) {
-            String[] numbers = line.split("\\s+"); // Split the line into individual numbers
-            for (String number : numbers) {
-                if (binIndex < this.histogram.length) {
-                    this.histogram[binIndex] = Double.parseDouble(number.trim()) / 255.0; // Normalizing the count by dividing by 255
-                    binIndex++;
+            this.histogram = new double[numberOfBins];
+
+            int indexB = 0; // Index of bin
+            while ((line = br.readLine()) != null) {
+
+                String[] numbers = line.split("\\s+"); 
+
+                for (String number : numbers) {
+                    if (indexB < this.histogram.length) {
+                        this.histogram[indexB] = Double.parseDouble(number.trim()) / 255.0; // Normalizing the count
+                        indexB++;
+                    }
                 }
             }
-        }
-        
-        if (binIndex != this.histogram.length) {
-            throw new IOException("Histogram file format is incorrect. Expected " + this.histogram.length + " bins, but found " + binIndex);
+
         }
     }
-}
 }
