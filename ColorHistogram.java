@@ -60,13 +60,29 @@ public class ColorHistogram {
     }
 
     // Save histogram
-    public void save(String filename) throws IOException{
+    public void save(String filename) throws IOException {
         try (PrintWriter out = new PrintWriter(filename)) {
+            // Write the number of bins on the first line
+            out.println(this.histogram.length);
+            
+            // Start the histogram values on the next line
+            // Use a StringBuilder to construct the line for efficiency
+            StringBuilder histogramValues = new StringBuilder();
             for (double val : this.histogram) {
-                out.println(val);
+                // Assuming values were normalized to [0,1], scale to [0,255]
+                // and convert to integer. Append each value followed by a space
+                histogramValues.append((int)Math.round(val * 255)).append(" ");
             }
+    
+            // Trim the StringBuilder to remove the last space and print the line
+            if (histogramValues.length() > 0) { // Check if the StringBuilder is not empty
+                // Remove the last space
+                histogramValues.setLength(histogramValues.length() - 1);
+            }
+            out.println(histogramValues.toString());
         }
     }
+    
 
     // Load Histogram
     private void load(String filename) throws IOException {
